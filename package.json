@@ -1,0 +1,19 @@
+{
+  "name": "open-meteo-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "weather-mcp-server": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
