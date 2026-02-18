@@ -1,8 +1,27 @@
 #!/usr/bin/env node
 
+// QUAL-01 (typed args): Satisfied by Zod-validated registerTool callbacks — no `args: any` needed.
+// QUAL-04 (registry dispatch): Satisfied by McpServer.registerTool — no if/else or switch on tool name needed.
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+
+// Shared Zod schema fragments — defined once and reused by both tool registrations (QUAL-03)
+const HOURLY_VARIABLES = z
+  .array(z.string())
+  .default(["temperature_2m", "precipitation", "wind_speed_10m"])
+  .describe("Hourly weather variables to include");
+
+const DAILY_VARIABLES = z
+  .array(z.string())
+  .default(["temperature_2m_max", "temperature_2m_min", "precipitation_sum"])
+  .describe("Daily weather variables to include");
+
+const TIMEZONE = z
+  .string()
+  .default("auto")
+  .describe("Timezone for the data (e.g., America/New_York, Europe/London, auto)");
 
 // Create the MCP server using the high-level McpServer API
 const server = new McpServer({ name: "weather-mcp-server", version: "1.0.0" });
@@ -14,26 +33,15 @@ server.registerTool("get_weather_forecast", {
   inputSchema: {
     latitude: z.number().describe("Latitude coordinate (WGS84)"),
     longitude: z.number().describe("Longitude coordinate (WGS84)"),
-    hourly: z
-      .array(z.string())
-      .default(["temperature_2m", "precipitation", "wind_speed_10m"])
-      .describe("Hourly weather variables to include"),
-    daily: z
-      .array(z.string())
-      .default(["temperature_2m_max", "temperature_2m_min", "precipitation_sum"])
-      .describe("Daily weather variables to include"),
+    hourly: HOURLY_VARIABLES,
+    daily: DAILY_VARIABLES,
     forecast_days: z
       .number()
       .min(1)
       .max(16)
       .default(7)
       .describe("Number of forecast days (1-16)"),
-    timezone: z
-      .string()
-      .default("auto")
-      .describe(
-        "Timezone for the forecast (e.g., America/New_York, Europe/London, auto)"
-      ),
+    timezone: TIMEZONE,
   },
 }, async ({ latitude, longitude, hourly, daily, forecast_days, timezone }) => {
   // Build the API URL
@@ -99,20 +107,9 @@ server.registerTool("get_historical_weather", {
     end_date: z
       .string()
       .describe("End date in YYYY-MM-DD format (e.g., 2024-01-31)"),
-    hourly: z
-      .array(z.string())
-      .default(["temperature_2m", "precipitation", "wind_speed_10m"])
-      .describe("Hourly weather variables to include"),
-    daily: z
-      .array(z.string())
-      .default(["temperature_2m_max", "temperature_2m_min", "precipitation_sum"])
-      .describe("Daily weather variables to include"),
-    timezone: z
-      .string()
-      .default("auto")
-      .describe(
-        "Timezone for the data (e.g., America/New_York, Europe/London, auto)"
-      ),
+    hourly: HOURLY_VARIABLES,
+    daily: DAILY_VARIABLES,
+    timezone: TIMEZONE,
   },
 }, async ({ latitude, longitude, start_date, end_date, hourly, daily, timezone }) => {
   // Build the API URL for historical data
