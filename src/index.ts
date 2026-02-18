@@ -31,8 +31,11 @@ async function fetchWeatherData(url: string): Promise<{
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
 
     if (!response.ok) {
       throw new Error(`API request failed: ${response.statusText}`);
@@ -49,6 +52,17 @@ async function fetchWeatherData(url: string): Promise<{
       ],
     };
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Error fetching weather data: Request timed out after 30 seconds",
+          },
+        ],
+        isError: true,
+      };
+    }
     return {
       content: [
         {
@@ -60,6 +74,8 @@ async function fetchWeatherData(url: string): Promise<{
       ],
       isError: true,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -148,6 +164,18 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("Weather MCP Server running on stdio");
+
+  process.on("SIGTERM", async () => {
+    console.error("Received SIGTERM, shutting down...");
+    await server.close();
+    process.exit(0);
+  });
+
+  process.on("SIGINT", async () => {
+    console.error("Received SIGINT, shutting down...");
+    await server.close();
+    process.exit(0);
+  });
 }
 
 main().catch((error) => {
