@@ -159,6 +159,8 @@ server.registerTool("get_historical_weather", {
   return fetchWeatherData(url);
 });
 
+export { server };
+
 // Start the server
 async function main() {
   const transport = new StdioServerTransport();
@@ -178,7 +180,7 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+if (isDirectRun) {
+  main().catch((error) => { console.error("Fatal error:", error); process.exit(1); });
+}
