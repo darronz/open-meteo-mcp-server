@@ -8,6 +8,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 // Shared Zod schema fragments — defined once and reused by both tool registrations (QUAL-03)
+const LATITUDE = z.number().min(-90).max(90).describe("Latitude coordinate (WGS84)");
+const LONGITUDE = z.number().min(-180).max(180).describe("Longitude coordinate (WGS84)");
+
 const HOURLY_VARIABLES = z
   .array(z.string())
   .default(["temperature_2m", "precipitation", "wind_speed_10m"])
@@ -68,8 +71,8 @@ server.registerTool("get_weather_forecast", {
   description:
     "Get weather forecast for a location using Open-Meteo API. Returns hourly and daily weather data including temperature, precipitation, wind, and more.",
   inputSchema: {
-    latitude: z.number().describe("Latitude coordinate (WGS84)"),
-    longitude: z.number().describe("Longitude coordinate (WGS84)"),
+    latitude: LATITUDE,
+    longitude: LONGITUDE,
     hourly: HOURLY_VARIABLES,
     daily: DAILY_VARIABLES,
     forecast_days: z
@@ -105,13 +108,15 @@ server.registerTool("get_historical_weather", {
   description:
     "Get historical weather data for a location using Open-Meteo Archive API. Returns past weather observations including temperature, precipitation, wind, and more.",
   inputSchema: {
-    latitude: z.number().describe("Latitude coordinate (WGS84)"),
-    longitude: z.number().describe("Longitude coordinate (WGS84)"),
+    latitude: LATITUDE,
+    longitude: LONGITUDE,
     start_date: z
       .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
       .describe("Start date in YYYY-MM-DD format (e.g., 2024-01-01)"),
     end_date: z
       .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
       .describe("End date in YYYY-MM-DD format (e.g., 2024-01-31)"),
     hourly: HOURLY_VARIABLES,
     daily: DAILY_VARIABLES,
