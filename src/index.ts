@@ -23,45 +23,11 @@ const TIMEZONE = z
   .default("auto")
   .describe("Timezone for the data (e.g., America/New_York, Europe/London, auto)");
 
-// Create the MCP server using the high-level McpServer API
-const server = new McpServer({ name: "weather-mcp-server", version: "1.0.0" });
-
-// Register the weather forecast tool
-server.registerTool("get_weather_forecast", {
-  description:
-    "Get weather forecast for a location using Open-Meteo API. Returns hourly and daily weather data including temperature, precipitation, wind, and more.",
-  inputSchema: {
-    latitude: z.number().describe("Latitude coordinate (WGS84)"),
-    longitude: z.number().describe("Longitude coordinate (WGS84)"),
-    hourly: HOURLY_VARIABLES,
-    daily: DAILY_VARIABLES,
-    forecast_days: z
-      .number()
-      .min(1)
-      .max(16)
-      .default(7)
-      .describe("Number of forecast days (1-16)"),
-    timezone: TIMEZONE,
-  },
-}, async ({ latitude, longitude, hourly, daily, forecast_days, timezone }) => {
-  // Build the API URL
-  const params = new URLSearchParams({
-    latitude: latitude.toString(),
-    longitude: longitude.toString(),
-    forecast_days: forecast_days.toString(),
-    timezone: timezone,
-  });
-
-  if (hourly && hourly.length > 0) {
-    params.append("hourly", hourly.join(","));
-  }
-
-  if (daily && daily.length > 0) {
-    params.append("daily", daily.join(","));
-  }
-
-  const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
-
+// Shared fetch/error/response helper — defined once, called by both tools (QUAL-02)
+async function fetchWeatherData(url: string): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+}> {
   try {
     const response = await fetch(url);
 
@@ -92,6 +58,46 @@ server.registerTool("get_weather_forecast", {
       isError: true,
     };
   }
+}
+
+// Create the MCP server using the high-level McpServer API
+const server = new McpServer({ name: "weather-mcp-server", version: "1.0.0" });
+
+// Register the weather forecast tool
+server.registerTool("get_weather_forecast", {
+  description:
+    "Get weather forecast for a location using Open-Meteo API. Returns hourly and daily weather data including temperature, precipitation, wind, and more.",
+  inputSchema: {
+    latitude: z.number().describe("Latitude coordinate (WGS84)"),
+    longitude: z.number().describe("Longitude coordinate (WGS84)"),
+    hourly: HOURLY_VARIABLES,
+    daily: DAILY_VARIABLES,
+    forecast_days: z
+      .number()
+      .min(1)
+      .max(16)
+      .default(7)
+      .describe("Number of forecast days (1-16)"),
+    timezone: TIMEZONE,
+  },
+}, async ({ latitude, longitude, hourly, daily, forecast_days, timezone }) => {
+  const params = new URLSearchParams({
+    latitude: latitude.toString(),
+    longitude: longitude.toString(),
+    forecast_days: forecast_days.toString(),
+    timezone: timezone,
+  });
+
+  if (hourly && hourly.length > 0) {
+    params.append("hourly", hourly.join(","));
+  }
+
+  if (daily && daily.length > 0) {
+    params.append("daily", daily.join(","));
+  }
+
+  const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+  return fetchWeatherData(url);
 });
 
 // Register the historical weather tool
@@ -112,7 +118,6 @@ server.registerTool("get_historical_weather", {
     timezone: TIMEZONE,
   },
 }, async ({ latitude, longitude, start_date, end_date, hourly, daily, timezone }) => {
-  // Build the API URL for historical data
   const params = new URLSearchParams({
     latitude: latitude.toString(),
     longitude: longitude.toString(),
@@ -130,37 +135,7 @@ server.registerTool("get_historical_weather", {
   }
 
   const url = `https://archive-api.open-meteo.com/v1/archive?${params.toString()}`;
-
-  try {
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(data, null, 2),
-        },
-      ],
-    };
-  } catch (error) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Error fetching historical weather data: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        },
-      ],
-      isError: true,
-    };
-  }
+  return fetchWeatherData(url);
 });
 
 // Start the server
